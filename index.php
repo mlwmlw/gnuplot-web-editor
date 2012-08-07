@@ -1,8 +1,7 @@
 <?php
 	session_start();
 	if (get_magic_quotes_gpc()) {
-    function stripslashes_gpc(&$value)
-    {
+    function stripslashes_gpc(&$value) {
         $value = stripslashes($value);
     }
     array_walk_recursive($_GET, 'stripslashes_gpc');
@@ -33,16 +32,18 @@
 		array_push($_SESSION['code'], $code);
 	}
 	
-	if(!$code) {		
+	if(!$code) {
 		$code = file_get_contents("./example/default.plot");		
 	}
-	$name = substr(str_shuffle(str_repeat('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',5)), 0, 5);
+	$name = substr(str_shuffle(str_repeat('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 5)), 0, 12);
 	$file = "/tmp/{$name}.plot";
-	file_put_contents($file, "set terminal png size 600,400 medium\nset output \"/tmp/{$name}.png\"\n" . $code);
-	$output = shell_exec("/usr/local/bin/gnuplot {$file} 2>&1");
-	if(strpos($output, 'invalid') !== FALSE) {
-		$code .= "\n {$output}" ;
-	}
+	file_put_contents($file, "
+set term png size 600,400 font 'Microsoft JhengHei,11'
+set output \"/tmp/{$name}.png\"
+" . $code);
+
+	$error = shell_exec("/usr/local/bin/gnuplot {$file} 2>&1");
+	unlink($file);	
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -117,8 +118,13 @@
 	          </div><!--/.well -->
 				</div>
 				<div class="span8">
+					<? if($error): ?>
+						<div class="alert alert-error">
+							<?=$error?>
+						</div>
+					<? endif;?>
 					<img src="./img.php?name=<?=$name?>">
-			    <form method="POST">
+			    <form method="POST" action="./index.php">
 						<textarea id="code" name="code"><?=$code?></textarea>
 						<br />
 						<center><input class="btn btn-primary" type="submit" value="Plot" /></center>
@@ -126,7 +132,7 @@
 				</div>
 			</div>
 			<footer>
-		    <p>&copy; Antslab 2012</p>
+		    <p>&copy; <a href="http://mlwmlw.org">mlwmlw.org</a> 2012</p>
 		  </footer>
 		</div> <!-- /container -->
 	
