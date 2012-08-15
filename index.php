@@ -1,19 +1,14 @@
 <?php
+	include('./config.php');
 	session_start();
-	if (get_magic_quotes_gpc()) {
-    function stripslashes_gpc(&$value) {
-        $value = stripslashes($value);
-    }
-    array_walk_recursive($_GET, 'stripslashes_gpc');
-    array_walk_recursive($_POST, 'stripslashes_gpc');
-    array_walk_recursive($_COOKIE, 'stripslashes_gpc');
-    array_walk_recursive($_REQUEST, 'stripslashes_gpc');
-	}
 	if(isset($_GET['action'])) {
 		if($_GET['action'] == 'clean') {
-			session_destroy();
-			header('Location: index.php');
+			session_destroy();		
 		}
+		else if($_GET['action'] == 'save' && isset($_POST['name']) && preg_match('/^[A-Za-z0-9-]+$/', $_POST['name'])){
+			file_put_contents('./record/' . $_POST['name']. '.plot', end($_SESSION['code']));
+		}	
+		header('Location: index.php');
 	}
 		
 	if(empty($_SESSION['code'])) {
@@ -37,13 +32,30 @@
 	}
 	$name = substr(str_shuffle(str_repeat('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 5)), 0, 12);
 	$file = "/tmp/{$name}.plot";
+	
+	//png pngcairo
 	file_put_contents($file, "
-set term png size 600,400 font 'Microsoft JhengHei,11'
+set terminal png size 600,400 font 'Microsoft JhengHei,10'
 set output \"/tmp/{$name}.png\"
 " . $code);
 
-	$error = shell_exec("/usr/local/bin/gnuplot {$file} 2>&1");
+	$error = shell_exec("{$config['gnuplot']} {$file} 2>&1");
 	unlink($file);	
+	
+	$examples = scan('./example');
+	$records = scan('./record');
+	function scan($path) {
+		$dir = scandir($path);
+		foreach($dir as $k => $file) {
+			if($file == 'default.plot' || $file == '.' || $file == '..' || strpos($file, '.') === 0) {
+				unset($dir[$k]);
+			}
+			else {
+				$dir[$k] = str_replace('.plot', '', $file);
+			}
+		}
+		return $dir;
+	}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -74,10 +86,19 @@ set output \"/tmp/{$name}.png\"
       	});
       	
       	$('.sidebar-nav a').click(function() {
-      		$.get('./example/' + $(this).text() + '.plot', function(res) {
+      		$.get($(this).attr('href'), function(res) {
       			myCodeMirror.setValue(res);
       		});
+					return false;
       	});
+
+      	$('.save').click(function() {
+					$('#saveModal').modal('show');
+					return false;
+				});
+				$('#saveModal .btn-save').click(function() {
+					$('#saveModal form').submit();
+				});
 			});
 		</script>
 		
@@ -89,7 +110,7 @@ set output \"/tmp/{$name}.png\"
           <a class="brand" href="#">Gnuplot </a>
           <div class="nav-collapse">
             <ul class="nav">
-              <li class="active"><a href="#">Home</a></li>
+              <li class="active"><a href="index.php">Home</a></li>
 
               <li class="dropdown">
 	              <a href="#" class="dropdown-toggle" data-toggle="dropdown">Histroy <b class="caret"></b></a>
@@ -99,6 +120,7 @@ set output \"/tmp/{$name}.png\"
 	                <? endforeach; ?>
 	              </ul>
 	            </li>
+	            <li><a class="save" href="?action=save">Save</a></li>
               <li><a href="?action=clean">Clean</a></li>
             </ul>
           </div><!--/.nav-collapse -->
@@ -112,12 +134,24 @@ set output \"/tmp/{$name}.png\"
 					 <div class="well sidebar-nav">
 	            <ul class="nav nav-list">
 	              <li class="nav-header">Example</li>
-	              <li><a href="javascript:void(0)">line</a></li>
-	              <li><a href="javascript:void(0)">histogram</a></li>
+	              <? foreach($examples as $example): ?>
+	              	<li><a href="./example/<?=$example?>.plot"><?=$example?></a></li>
+	              <? endforeach; ?>
+	              <li class="nav-header">Record</li>
+	              <? foreach($records as $record): ?>
+	              	<li><a href="./record/<?=$record?>.plot"><?=$record?></a></li>
+	              <? endforeach; ?>
+
 	            </ul>
 	          </div><!--/.well -->
 				</div>
 				<div class="span8">
+					<? if($warning): ?>
+						<div class="alert alert-warning">
+							<?=$warning?>
+						</div>
+					<? endif;?>
+
 					<? if($error): ?>
 						<div class="alert alert-error">
 							<?=$error?>
@@ -135,8 +169,27 @@ set output \"/tmp/{$name}.png\"
 		    <p>&copy; <a href="http://mlwmlw.org">mlwmlw.org</a> 2012</p>
 		  </footer>
 		</div> <!-- /container -->
-	
+		<div class="modal hide" id="saveModal"> 
+  <div class="modal-header"> 
+    <button type="button" class="close" data-dismiss="modal">×</button> 
+    <h3>save gnuplot</h3> 
+  </div> 
+  
+  <div class="modal-body"> 
+	    <form class="well" method="post" action="?action=save"> 
+	      <div class="control-group"> 
+		    	<label class="control-label">Name</label> 
+				  <input type="text" name="name" class="input" placeholder="file name"> 
+			  </div> 
+			</form> 
+	  </div> 
+	  <div class="modal-footer"> 
+	    <a href="javascript:void(0)" class="btn" data-dismiss="modal">Cencel</a> 
+	    <a href="javascript:void(0)" class="btn btn-primary btn-save">Save</a> 
+	  </div> 
+	</div>
     <script src="./assets/bootstrap/js/bootstrap-dropdown.js"></script>
+    <script src="./assets/bootstrap/js/bootstrap-modal.js"></script>
 
 	</body>
 </html>
